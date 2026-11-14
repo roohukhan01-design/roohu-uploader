@@ -1,0 +1,98 @@
+name: Bootstrap and Build Roohu GitHub Uploader
+
+on:
+  push:
+    paths:
+      - "roohu-github-uploader-complete-source.zip"
+      - ".github/workflows/bootstrap-and-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check source archive
+        id: archive
+        shell: bash
+        run: |
+          if [ ! -f roohu-github-uploader-complete-source.zip ]; then
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "Upload roohu-github-uploader-complete-source.zip to the repository root to continue."
+          else
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node.js
+        if: steps.archive.outputs.found == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Java
+        if: steps.archive.outputs.found == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Extract source into repository root
+        if: steps.archive.outputs.found == 'true'
+        run: |
+          mkdir -p extracted
+          unzip -q roohu-github-uploader-complete-source.zip -d extracted
+          cp -a extracted/roohu-github-uploader/. .
+          rm -rf extracted
+
+      - name: Commit extracted source files
+        if: steps.archive.outputs.found == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add Roohu GitHub Uploader source" || echo "No source changes to commit"
+          git push
+
+      - name: Check source syntax
+        if: steps.archive.outputs.found == 'true'
+        run: |
+          node --check www/app.js
+          python3 -m py_compile scripts/patch-android.py
+
+      - name: Install dependencies
+        if: steps.archive.outputs.found == 'true'
+        run: npm install
+
+      - name: Add Android platform
+        if: steps.archive.outputs.found == 'true'
+        run: npx cap add android
+
+      - name: Apply native Android plugin
+        if: steps.archive.outputs.found == 'true'
+        run: python3 scripts/patch-android.py
+
+      - name: Sync Capacitor
+        if: steps.archive.outputs.found == 'true'
+        run: npx cap sync android
+
+      - name: Build debug APK
+        if: steps.archive.outputs.found == 'true'
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        if: steps.archive.outputs.found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: roohu-github-uploader-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
