@@ -5,15 +5,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'index.html'
-      - 'app.js'
-      - 'style.css'
-      - 'package.json'
-      - 'capacitor.config.json'
-      - '*.java'
-      - 'patch-android.py'
-      - '.github/workflows/build-apk.yml'
 
 permissions:
   contents: read
@@ -22,7 +13,10 @@ jobs:
   build-apk:
     name: Build Android debug APK
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
       - name: Checkout repository
@@ -39,8 +33,15 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "Android sdkmanager was not found on the runner."
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Prepare Capacitor web and native source folders
         run: |
