@@ -1,0 +1,7 @@
+{
+  "appId": "com.roohu.githubuploader",
+  "appName": "Roohu GitHub Uploader",
+  "webDir": "www",
+  "backgroundColor": "#060914",
+  "android": { "allowMixedContent": false }
+}
